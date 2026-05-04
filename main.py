@@ -231,4 +231,28 @@ def booking(booking_request: BookingRequest):
     return db_manager.book_with_validation(customer_name,date,time,people,customer_phone,customer_email,special_requirement)
 
 
+@app.post("/cancel")
+def canceling(cancel_request: CancelRequest):
+    reference = cancel_request.reference
+    return db_manager.cancel_reservation(reference)
 
+
+@app.post("/update")
+def updating(update_request: UpdateRequest):
+    reference = update_request.reference
+    new_date = update_request.new_date
+    new_time = update_request.new_time
+    new_people = update_request.new_people
+    return db_manager.update_reservation(reference, new_date, new_time, new_people)
+
+@app.get("/reservations")
+def getting_reservations(date):
+    return db_manager.get_all_reservations(date)
+
+@app.post("/check")
+def checking(check_request: CheckAvailability):
+    date = check_request.date
+    time = check_request.time
+    people = check_request.people
+    
+    return db_manager.check_availability(date,time,people)
