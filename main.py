@@ -34,7 +34,7 @@ class CancelRequest(BaseModel):
     reference: int
 
 class UpdateRequest(BaseModel):
-    reference: str
+    reference: int
     new_date: Optional[str] = None
     new_time: Optional[str] = None
     new_people: Optional[int] = None
@@ -114,7 +114,7 @@ def cancel_my_reservation(reference: str) -> dict:
     return db_manager.cancel_reservation(reference)
 
 @tool
-def update_my_reservation(reference: int, new_date: str, new_time: str, new_people: str=None ) -> dict:
+def update_my_reservation(reference: str, new_date: str = None, new_time: str= None, new_people: str= None ) -> dict:
     """Updates an existing reservation by reference number.
     Use this when customer wants to change their booking details.
     Only provide the fields that need to be changed.
@@ -196,19 +196,15 @@ def chat(message: ChatMessage):
         query = message.message
 
         history = get_session(session_id)
-        processed_query = process_query(query, history)
-        context, sources = retrieve_context(processed_query)
-        prompt = build_prompt(query, context, history)
+        history.append(HumanMessage(content=query))
 
-        response = llm.invoke([HumanMessage(content=prompt)])
-        answer = response.content
+        result = agent.invoke({"messages": history})
+        ai_message = result["messages"][-1]
 
-        history.append({"role": "user", "content": query})
-        history.append({"role": "assistant", "content": answer})
+        history.append(ai_message)
 
         return {
-            "answer": answer,
-            "sources": sources,
+            "answer": ai_message.content,
             "session_id": session_id,
             "history_length": len(history)
         }
@@ -224,7 +220,7 @@ def booking(booking_request: BookingRequest):
     customer_name = booking_request.customer_name
     date = booking_request.date
     time = booking_request.time
-    people = booking_request.poeple
+    people = booking_request.people
     customer_phone = booking_request.customer_phone
     customer_email = booking_request.customer_email
     special_requirement = booking_request.special_requirement
@@ -246,7 +242,7 @@ def updating(update_request: UpdateRequest):
     return db_manager.update_reservation(reference, new_date, new_time, new_people)
 
 @app.get("/reservations")
-def getting_reservations(date):
+def getting_reservations(date: str= None):
     return db_manager.get_all_reservations(date)
 
 @app.post("/check")

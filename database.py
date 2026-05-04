@@ -399,7 +399,7 @@ class DatabaseManager:
                 "message": f"Reservation {reference} updated successfully"
             }
     
-    def cancel_reservation(self, reference:str) -> dict:
+    def cancel_reservation(self, reference:int) -> dict:
         """Cancels a reservation by setting status to cancelled."""
 
         with get_db() as db:
