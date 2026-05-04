@@ -16,6 +16,7 @@ api_key = os.getenv("API_KEY")
 if not api_key:
     raise ValueError("API KEY is missing in env file")
 
+app = FastAPI()
 sessions = {}
 db_manager = DatabaseManager("restaurant.db")
 
@@ -187,3 +188,47 @@ def get_session(session_id: str) -> list:
         sessions[session_id] = []
 
     return sessions[session_id]
+
+@app.post("/chat")
+def chat(message: ChatMessage):
+    try:
+        session_id = message.session_id
+        query = message.message
+
+        history = get_session(session_id)
+        processed_query = process_query(query, history)
+        context, sources = retrieve_context(processed_query)
+        prompt = build_prompt(query, context, history)
+
+        response = llm.invoke([HumanMessage(content=prompt)])
+        answer = response.content
+
+        history.append({"role": "user", "content": query})
+        history.append({"role": "assistant", "content": answer})
+
+        return {
+            "answer": answer,
+            "sources": sources,
+            "session_id": session_id,
+            "history_length": len(history)
+        }
+
+    except Exception as e:
+        return {
+            "answer": "Sorry I am having trouble right now. Please try again.",
+            "error": str(e)
+        }
+
+@app.post("/book")
+def booking(booking_request: BookingRequest):
+    customer_name = booking_request.customer_name
+    date = booking_request.date
+    time = booking_request.time
+    people = booking_request.poeple
+    customer_phone = booking_request.customer_phone
+    customer_email = booking_request.customer_email
+    special_requirement = booking_request.special_requirement
+    return db_manager.book_with_validation(customer_name,date,time,people,customer_phone,customer_email,special_requirement)
+
+
+
