@@ -20,3 +20,31 @@ sessions = {}
 db_manager = DatabaseManager("restaurant.db")
 
 
+class BookingRequest(BaseModel):
+    customer_name: str
+    date: str
+    time: str
+    people: int
+    customer_phone: str
+    customer_email: str
+    special_requirement: str
+
+class CancelRequest(BaseModel):
+    reference: str
+
+class UpdateRequest(BaseModel):
+    reference: str
+    new_date: str
+    new_time: str
+    new_people: int
+
+class ChatMessage(BaseModel):
+    session_id: str
+    message: str
+
+class CheckAvailablilit(BaseModel):
+    date: str
+    time: str
+    people: int
+
+
