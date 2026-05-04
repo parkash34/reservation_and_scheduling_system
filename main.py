@@ -25,18 +25,18 @@ class BookingRequest(BaseModel):
     date: str
     time: str
     people: int
-    customer_phone: str
-    customer_email: str
-    special_requirement: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    special_requirement: Optional[str] = None
 
 class CancelRequest(BaseModel):
-    reference: str
+    reference: int
 
 class UpdateRequest(BaseModel):
     reference: str
-    new_date: str
-    new_time: str
-    new_people: int
+    new_date: Optional[str] = None
+    new_time: Optional[str] = None
+    new_people: Optional[int] = None
 
 class ChatMessage(BaseModel):
     session_id: str
@@ -56,7 +56,7 @@ class ChatMessage(BaseModel):
             raise ValueError("Message is Empty")
         return v
     
-class CheckAvailablilit(BaseModel):
+class CheckAvailability(BaseModel):
     date: str
     time: str
     people: int
@@ -70,43 +70,72 @@ llm = ChatGroq(
 
 @tool
 def check_table_availability(date: str, time: str, people: str) -> dict:
+    """Checks if a table is available for a specific date, time and number of people.
+    Use this BEFORE booking to verify availability.
+    Date format must be YYYY-MM-DD like 2026-05-04.
+    Time can be any format like 7 PM, 19:00 or 7:00 PM.
+    People must be a number like 4."""
     people = int(people)
     return db_manager.check_availability(date, time, people)
 
 @tool
 def book_table(customer_name: str, date: str, time: str , people: str, special_requirement: str = None) -> dict:
+    """Books a table at the restaurant for a customer.
+    Use this AFTER checking availability.
+    Requires customer name, date in YYYY-MM-DD format, time and number of people.
+    Special requirement is optional — use for dietary needs or special occasions.
+    Always check availability first before calling this tool."""
     people = int(people)
     return db_manager.book_with_validation(customer_name, date, time, people, None, None, special_requirement)
 
 @tool
 def get_my_reservation(reference: str) -> dict:
+    """Retrieves reservation details by reference number.
+    Use this when customer asks about their existing booking.
+    Requires the reference number given at time of booking."""
     reference = int(reference)
     return db_manager.get_reservation_by_reference(reference)
 
 @tool
 def find_reservations_by_name(name: str) -> dict:
+    """Finds all reservations for a customer by their name.
+    Use this when customer provides their name and wants to see their bookings.
+    Returns all confirmed reservations sorted by date and time."""
     return db_manager.get_reservations_by_name(name)
 
 @tool
 def cancel_my_reservation(reference: str) -> dict:
+    """Cancels an existing reservation by reference number.
+    Use this when customer wants to cancel their booking.
+    Requires the reference number.
+    Always confirm with customer before cancelling."""
     reference = int(reference)
     return db_manager.cancel_reservation(reference)
 
 @tool
 def update_my_reservation(reference: int, new_date: str, new_time: str, new_people: str=None ) -> dict:
+    """Updates an existing reservation by reference number.
+    Use this when customer wants to change their booking details.
+    Only provide the fields that need to be changed.
+    Reference number is required.
+    New date format must be YYYY-MM-DD.
+    New time can be any format like 7 PM or 19:00."""
     reference = int(reference)
-    new_people = int(new_people)
+    new_people = int(new_people) if new_people else None
     return db_manager.update_reservation(reference, new_date, new_time, new_people)
+
+
+config = db_manager.get_config()
 
 system_prompt = f"""You are Sofia, a reservation specialist for Bella Italia restaurant.
     You ONLY handle table bookings, cancellations, updates and reservation lookups.
-    
+
     RESTAURANT INFORMATION:
     - Name: Bella Italia
     - Location: Astoria, New York
     - Phone: 123-456-7890
-    - Opening Hours: 12:00 PM to 11:00 PM
-    - Maximum capacity: 50 people
+    - Opening Hours:{config['opening_time']} to {config['closing_time']}
+    - Maximum capacity: {config["max_capacity"]}
 
     TOOL USAGE RULES:
     - Always call check_table_availability() before booking
@@ -152,7 +181,6 @@ tools = [
 ]
 
 agent = create_react_agent(llm, tools, prompt=system_prompt)
-
 
 def get_session(session_id: str) -> list:
     if session_id not in sessions:
