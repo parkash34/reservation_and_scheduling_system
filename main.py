@@ -61,4 +61,9 @@ class CheckAvailablilit(BaseModel):
     time: str
     people: int
 
-
+llm = ChatGroq(
+        model="llama-3.3-70b-versatile",
+        temperature=0.2,
+        max_tokens=500,
+        api_key=api_key
+    )
