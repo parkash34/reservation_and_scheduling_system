@@ -67,3 +67,37 @@ llm = ChatGroq(
         max_tokens=500,
         api_key=api_key
     )
+
+@tool
+def check_table_availablility(date: str, time: str, people: str) -> dict:
+    people = int(people)
+    return db_manager.check_availability(date, time, people)
+
+@tool
+def book_table(customer_name: str, date: str, time: str , people: str, special_requirement: str = None) -> dict:
+    people = int(people)
+    return db_manager.book_with_validation(customer_name, date, time, people, None, None, special_requirement)
+
+@tool
+def get_my_reservation(reference: str) -> dict:
+    reference = int(reference)
+    return db_manager.get_reservation_by_reference(reference)
+
+@tool
+def find_reservations_by_name(name: str) -> dict:
+    return db_manager.get_reservations_by_name(name)
+
+@tool
+def cancel_my_reservation(reference: str) -> dict:
+    reference = int(reference)
+    return db_manager.cancel_reservation(reference)
+
+@tool
+def update_my_reservation(reference: int, new_date: str, new_time: str, new_people: str=None ) -> dict:
+    reference = int(reference)
+    new_people = int(new_people)
+    return db_manager.update_reservation(reference, new_date, new_time, new_people)
+
+
+
+     
