@@ -258,11 +258,14 @@ class DatabaseManager:
                 "success": False,
                 "message": availability["message"]
             }
+        
+        normalized = self.normalize_time(time)
+        normalized_time = normalized["normalized"]
 
         result = self.create_reservation(
             customer_name=customer_name,
             date=date,
-            time=time,
+            time=normalized_time,
             people=people,
             customer_phone=customer_phone,
             customer_email=customer_email,
