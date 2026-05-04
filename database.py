@@ -125,28 +125,23 @@ class DatabaseManager:
                 "message": "Invalid time format. Please use HH:MM format like 19:00"
             }
     
+    def is_future_date(self, booking_date: str, booking_time: str) -> dict:
+        """Checks if booking is in the future."""
+        try:
+            booking_datetime = datetime.strptime(
+                f"{booking_date} {booking_time}",
+                "%Y-%m-%d %H:%M"
+            )
 
-from datetime import datetime, date as date_type
-
-def is_future_date(self, booking_date: str, booking_time: str) -> dict:
-    """Checks if booking is in the future."""
-    try:
-        # Combine date and time
-        booking_datetime = datetime.strptime(
-            f"{booking_date} {booking_time}",
-            "%Y-%m-%d %H:%M"
-        )
-
-        if booking_datetime < datetime.now():
+            if booking_datetime < datetime.now():
+                return {
+                    "valid": False,
+                    "message" : "Cannot book in the past. Pleasae choose a future date."
+                }
+            return {"valid": True}
+        except ValueError:
             return {
                 "valid": False,
-                "message": "Cannot book in the past. Please choose a future date."
+                "message": "Invalid date formate. Please use YYYY-MM-DD like 2026-05-04"
             }
 
-        return {"valid": True}
-
-    except ValueError:
-        return {
-            "valid": False,
-            "message": "Invalid date format. Please use YYYY-MM-DD like 2024-03-25"
-        }
