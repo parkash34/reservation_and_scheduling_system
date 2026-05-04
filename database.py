@@ -86,6 +86,7 @@ class DatabaseManager:
                 }
             except ValueError:
                 continue
+
         return {
             "valid" : False,
             "message" : f"Could not understand time '{time_str}'. Please use format like 10:00 PM or 22:00"
@@ -138,10 +139,108 @@ class DatabaseManager:
                     "valid": False,
                     "message" : "Cannot book in the past. Pleasae choose a future date."
                 }
+            
             return {"valid": True}
+        
         except ValueError:
             return {
                 "valid": False,
                 "message": "Invalid date formate. Please use YYYY-MM-DD like 2026-05-04"
             }
+        
+    
+    def validate_capacity(self, people: int, date: str, time: str) -> dict:
+        """Checks if restaurant has capacity for requested people."""
+        config = self.get_config()
+        max_capacity = config["max_capacity"]
+        slot_duration = config["slot_duration"]
 
+        with get_db() as db:
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT COALESCE(SUM(people), 0) as total_booked
+                FROM reservations
+                WHERE date = ?
+                AND status = 'confirmed'
+                AND time BETWEEN
+                    time(?, '-' || ? || ' minutes')
+                    AND time(?, '+' || ? || ' minutes')
+            """, (date, time, slot_duration, time, slot_duration))
+
+            row = cursor.fetchone()
+            total_booked = row["total_booked"]
+            remaining = max_capacity - total_booked
+
+            if people > remaining:
+                return {
+                    "valid": False,
+                    "available_capacity" : remaining,
+                    "message": f"Sorry we only have space for {remaining} more people at that time." 
+                }
+            
+            return {
+                "valid" : True,
+                "available_capacity": remaining
+            } 
+
+    def check_availability(self, date, time: str, people) -> dict:
+        """Full availability check combining all validations."""
+
+        time_result = self.normalize_time(time)
+        if not time_result["valid"]:
+            return {"valid": False, "message": time_result["message"]}
+    
+        normalized_time = time_result["normalized"]
+
+        time_check = self.is_within_opening_hours(normalized_time)
+        if not time_check["valid"]:
+            return time_check
+        
+        date_check = self.is_future_date(date, normalized_time)
+        if not date_check["valid"]:
+            return date_check
+
+        capacity_check = self.validate_capacity(people, date, normalized_time)
+        if not capacity_check["valid"]:
+            return capacity_check
+
+        return {
+            "valid": True,
+            "message": f"Table available for {people} people on {date} at {normalized_time}",
+            "available_capacity": capacity_check["available_capacity"]
+        }
+        
+    def create_reservation(self, customer_name, date, time_str, people, customer_phone, customer_email, special_requirement) -> dict:
+        return None
+
+    def book_with_validation(self, customer_name: str, date: str, time: str, people: int, customer_phone: str = None, customer_email: str = None, special_requirement: str = None ) -> dict:
+        """Complete booking with all validations."""
+
+        availability = self.check_availability(date, time, people)
+        if not availability["valid"]:
+            return {
+                "success": False,
+                "message": availability["message"]
+            }
+
+        result = self.create_reservation(
+            customer_name=customer_name,
+            date=date,
+            time=time,
+            people=people,
+            customer_phone=customer_phone,
+            customer_email=customer_email,
+            special_requirement=special_requirement
+        )
+
+        return result
+    
+    def get_reservations_by_name(self, name) -> dict:
+        return None
+    def get_all_reservations(self, date=None) -> dict:
+        return None
+    def update_reservation(self, reference, new_date=None, new_time=None, new_people=None) -> dict:
+        return None
+    def cancel_reservation(self, reference) -> dict:
+        return None
+    
