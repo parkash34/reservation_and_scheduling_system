@@ -7,6 +7,7 @@ from datetime import timedelta, datetime
 @contextmanager
 def get_db():
     connect = sqlite3.connect("restaurant.db")
+    connect.row_factory = sqlite3.Row
     try:
         yield connect
         connect.commit()
@@ -21,12 +22,13 @@ class DatabaseManager:
         self.db_path = db_path
         self.init_db()
 
-    def init_db():
+    def init_db(self):
         """Create tables if they don't exist."""
         with get_db() as db:
+            db.row_factory = sqlite3.Row
             cursor = db.cursor()
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS reservation(
+                CREATE TABLE IF NOT EXISTS reservations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     customer_name TEXT NOT NULL,
                     customer_phone TEXT,
@@ -39,7 +41,8 @@ class DatabaseManager:
                     reference INTEGER UNIQUE NOT NULL,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
-        """)
+            """)
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS restaurant_config (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +51,14 @@ class DatabaseManager:
                     closing_time TEXT DEFAULT "23:00",
                     slot_duration INTEGER DEFAULT "90"
                 )
-        """)
+            """)
+
+            cursor.execute("""
+                INSERT OR IGNORE INTO restaurant_config
+                (id, max_capacity, opening_time, closing_time, slot_duration)
+                VALUES (1, 50, '12:00', '23:00', 90)
+            """)
+
     def get_config(self) -> dict:
         """Get restaurant configuration."""
 
@@ -80,10 +90,10 @@ class DatabaseManager:
 
         for fmt in formats:
             try:
-                self.parsed = datetime.strptime(time, fmt)
+                parsed = datetime.strptime(time, fmt)
                 return {
                     "valid": True,
-                    "normalized": self.parsed.strftime("%H:%M")
+                    "normalized": parsed.strftime("%H:%M")
                 }
             except ValueError:
                 continue
@@ -93,7 +103,7 @@ class DatabaseManager:
             "message" : f"Could not understand time '{time}'. Please use format like 10:00 PM or 22:00"
         }
     
-    def is_with_opening_hours(self, requrest_time: str) -> dict:
+    def is_within_opening_hours(self, requested_time: str) -> dict:
         """Checks if requested time is within opening hours."""
 
         try:
@@ -101,7 +111,7 @@ class DatabaseManager:
 
             opening = datetime.strptime(config["opening_time"], "%H:%M").time()
             closing = datetime.strptime(config["closing_time"], "%H:%M").time()
-            requested = datetime.strptime(requrest_time, "%H:%M").time()
+            requested = datetime.strptime(requested_time, "%H:%M").time()
 
             last_booking_minutes = (
                 datetime.combine(datetime.today(), closing) -
@@ -139,7 +149,7 @@ class DatabaseManager:
             if booking_datetime < datetime.now():
                 return {
                     "valid": False,
-                    "message" : "Cannot book in the past. Pleasae choose a future date."
+                    "message" : "Cannot book in the past. Please choose a future date."
                 }
             
             return {"valid": True}
@@ -147,7 +157,7 @@ class DatabaseManager:
         except ValueError:
             return {
                 "valid": False,
-                "message": "Invalid date formate. Please use YYYY-MM-DD like 2026-05-04"
+                "message": "Invalid date format. Please use YYYY-MM-DD like 2026-05-04"
             }
         
     
@@ -261,7 +271,32 @@ class DatabaseManager:
 
         return result
 
+    def get_reservation_by_reference(self, reference: int) -> dict:
+        """Gets reservation by reference number."""
+        with get_db() as db:
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT * FROM reservations
+                WHERE reference = ? AND status = 'confirmed'
+            """, (reference,))
+            row = cursor.fetchone()
 
+            if not row:
+                return {"found": False, "message": f"No reservation found with reference {reference}"}
+
+            return {
+                "found": True,
+                "reservation": {
+                    "reference": row["reference"],
+                    "customer_name": row["customer_name"],
+                    "date": row["date"],
+                    "time": row["time"],
+                    "people": row["people"],
+                    "special_requirement": row["special_requirement"],
+                    "status": row["status"]
+                }
+            }
+    
     def get_reservations_by_name(self, name: str) -> dict:
         """Gets all reservations for a customer."""
 
