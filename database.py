@@ -90,3 +90,63 @@ class DatabaseManager:
             "valid" : False,
             "message" : f"Could not understand time '{time_str}'. Please use format like 10:00 PM or 22:00"
         }
+    
+    def is_with_opening_hours(self, requrest_time: str) -> dict:
+        """Checks if requested time is within opening hours."""
+
+        try:
+            config = self.get_config()
+
+            opening = datetime.strptime(config["opening_time"], "%H:%M").time()
+            closing = datetime.strptime(config["closing_time"], "%H:%M").time()
+            requested = datetime.strptime(requrest_time, "%H:%M").time()
+
+            last_booking_minutes = (
+                datetime.combine(datetime.today(), closing) -
+                timedelta(minutes=config["slot_duration"])
+            ).time()
+
+            if requested < opening:
+                return {
+                    "valid": False,
+                    "message": f"We open at {config['opening_time']}. Please book after that."
+                }
+            if requested > last_booking_minutes:
+                return {
+                    "valid": False,
+                    "message": f"Last booking is at {last_booking_minutes.strftime('%H:%M')}. We close at {config['closing_time']}."
+                }
+            
+            return {"valid" : True}
+        
+        except ValueError:
+            return {
+                "valid": False,
+                "message": "Invalid time format. Please use HH:MM format like 19:00"
+            }
+    
+
+from datetime import datetime, date as date_type
+
+def is_future_date(self, booking_date: str, booking_time: str) -> dict:
+    """Checks if booking is in the future."""
+    try:
+        # Combine date and time
+        booking_datetime = datetime.strptime(
+            f"{booking_date} {booking_time}",
+            "%Y-%m-%d %H:%M"
+        )
+
+        if booking_datetime < datetime.now():
+            return {
+                "valid": False,
+                "message": "Cannot book in the past. Please choose a future date."
+            }
+
+        return {"valid": True}
+
+    except ValueError:
+        return {
+            "valid": False,
+            "message": "Invalid date format. Please use YYYY-MM-DD like 2024-03-25"
+        }
