@@ -213,3 +213,7 @@ API_KEY=your_groq_api_key
 - Database created automatically on first run
 - All times stored in HH:MM 24 hour format
 - Conflict checking uses slot duration window
+
+## 👤 Author
+
+**Ohm Parkash** — [LinkedIn](https://www.linkedin.com/in/om-parkash34/) · [GitHub](https://github.com/parkash34)
