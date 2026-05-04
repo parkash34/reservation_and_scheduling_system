@@ -51,6 +51,7 @@ class DatabaseManager:
         """)
     def get_config(self) -> dict:
         """Get restaurant configuration."""
+
         with get_db() as db:
             cursor = db.cursor()
             cursor.execute("SELECT * FROM restaurant_config WHERE id = 1")
@@ -62,10 +63,10 @@ class DatabaseManager:
                 "slot_duration" : row["slot_duration"]
             }
         
-    def normalize_time(self, time_str: str) -> dict:
+    def normalize_time(self, time: str) -> dict:
         """Converts any time format to HH:MM 24 hour format."""
 
-        time_str = time_str.strip().upper()
+        time = time.strip().upper()
     
         formats = [
             "%I:%M %p",   # 10:00 PM
@@ -79,7 +80,7 @@ class DatabaseManager:
 
         for fmt in formats:
             try:
-                self.parsed = datetime.strptime(time_str, fmt)
+                self.parsed = datetime.strptime(time, fmt)
                 return {
                     "valid": True,
                     "normalized": self.parsed.strftime("%H:%M")
@@ -89,7 +90,7 @@ class DatabaseManager:
 
         return {
             "valid" : False,
-            "message" : f"Could not understand time '{time_str}'. Please use format like 10:00 PM or 22:00"
+            "message" : f"Could not understand time '{time}'. Please use format like 10:00 PM or 22:00"
         }
     
     def is_with_opening_hours(self, requrest_time: str) -> dict:
@@ -128,6 +129,7 @@ class DatabaseManager:
     
     def is_future_date(self, booking_date: str, booking_time: str) -> dict:
         """Checks if booking is in the future."""
+
         try:
             booking_datetime = datetime.strptime(
                 f"{booking_date} {booking_time}",
@@ -151,6 +153,7 @@ class DatabaseManager:
     
     def validate_capacity(self, people: int, date: str, time: str) -> dict:
         """Checks if restaurant has capacity for requested people."""
+
         config = self.get_config()
         max_capacity = config["max_capacity"]
         slot_duration = config["slot_duration"]
@@ -183,7 +186,7 @@ class DatabaseManager:
                 "available_capacity": remaining
             } 
 
-    def check_availability(self, date, time: str, people) -> dict:
+    def check_availability(self, date: str, time: str, people) -> dict:
         """Full availability check combining all validations."""
 
         time_result = self.normalize_time(time)
@@ -210,7 +213,8 @@ class DatabaseManager:
             "available_capacity": capacity_check["available_capacity"]
         }
         
-    def create_reservation(self, customer_name, date, time: str, people, customer_phone, customer_email, special_requirement) -> dict:
+    def create_reservation(self, customer_name: str, date: str, time: str, people: int, customer_phone: str = None, customer_email: str = None, special_requirement: str= None) -> dict:
+        """Creates reservation for customers"""
         try:
             for attempt in range(5):
                 reference = random.randint(10000, 99999)
@@ -229,6 +233,7 @@ class DatabaseManager:
                     }
                 except sqlite3.IntegrityError:
                     continue 
+
             return {"success": False, "error": "Could not generate unique reference"}
 
         except Exception as e:
@@ -257,8 +262,9 @@ class DatabaseManager:
         return result
 
 
-    def get_reservations_by_name(self, name) -> dict:
+    def get_reservations_by_name(self, name: str) -> dict:
         """Gets all reservations for a customer."""
+
         with get_db() as db:
             cursor = db.cursor()
             cursor.execute("""
@@ -282,9 +288,9 @@ class DatabaseManager:
 
             return {"found": True, "reservations": reservations}
         
-    def get_all_reservations(self, date=None) -> dict:
+    def get_all_reservations(self, date: str=None) -> dict:
         """Gets all confirmed reservations optionally filtered by date."""
-        
+
         with get_db() as db:
             cursor = db.cursor()
             if date:
@@ -317,7 +323,7 @@ class DatabaseManager:
                 "reservations": reservations
             }
         
-    def update_reservation(self, reference : int, new_date: str = None, new_time: str =None, new_people: str =None) -> dict:
+    def update_reservation(self, reference : int, new_date: str= None, new_time: str= None, new_people: str= None) -> dict:
         """Updates an existing reservation."""
 
         with get_db() as db:
@@ -358,7 +364,7 @@ class DatabaseManager:
                 "message": f"Reservation {reference} updated successfully"
             }
     
-    def cancel_reservation(self, reference) -> dict:
+    def cancel_reservation(self, reference:str) -> dict:
         """Cancels a reservation by setting status to cancelled."""
 
         with get_db() as db:
