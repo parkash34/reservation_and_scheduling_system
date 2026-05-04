@@ -210,8 +210,29 @@ class DatabaseManager:
             "available_capacity": capacity_check["available_capacity"]
         }
         
-    def create_reservation(self, customer_name, date, time_str, people, customer_phone, customer_email, special_requirement) -> dict:
-        return None
+    def create_reservation(self, customer_name, date, time: str, people, customer_phone, customer_email, special_requirement) -> dict:
+        try:
+            for attempt in range(5):
+                reference = random.randint(10000, 99999)
+                try:
+                    with get_db() as db:
+                        cursor = db.cursor()
+                        cursor.execute("""
+                            INSERT INTO reservations
+                            (customer_name, date, time, people, reference)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (customer_name, date, time, people, reference))
+                    
+                    return {
+                        "success": True,
+                        "reference": reference
+                    }
+                except sqlite3.IntegrityError:
+                    continue 
+            return {"success": False, "error": "Could not generate unique reference"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def book_with_validation(self, customer_name: str, date: str, time: str, people: int, customer_phone: str = None, customer_email: str = None, special_requirement: str = None ) -> dict:
         """Complete booking with all validations."""
@@ -234,13 +255,110 @@ class DatabaseManager:
         )
 
         return result
-    
+
+
     def get_reservations_by_name(self, name) -> dict:
         return None
     def get_all_reservations(self, date=None) -> dict:
-        return None
-    def update_reservation(self, reference, new_date=None, new_time=None, new_people=None) -> dict:
-        return None
+        """Gets all confirmed reservations optionally filtered by date."""
+        with get_db() as db:
+            cursor = db.cursor()
+            if date:
+                cursor.execute("""
+                    SELECT * FROM reservations
+                    WHERE date = ? AND status = 'confirmed'
+                    ORDER BY time
+                """, (date,))
+            else:
+                cursor.execute("""
+                    SELECT * FROM reservations
+                    WHERE status = 'confirmed'
+                    ORDER BY date, time
+                """)
+
+            rows = cursor.fetchall()
+            reservations = []
+            for row in rows:
+                reservations.append({
+                    "reference": row["reference"],
+                    "customer_name": row["customer_name"],
+                    "date": row["date"],
+                    "time": row["time"],
+                    "people": row["people"],
+                    "status": row["status"]
+                })
+
+            return {
+                "total": len(reservations),
+                "reservations": reservations
+            }
+        
+    def update_reservation(self, reference : int, new_date: str = None, new_time: str =None, new_people: str =None) -> dict:
+        """Updates an existing reservation."""
+
+        with get_db() as db:
+            cursor = db.cursor()
+
+            cursor.execute("""
+                SELECT * FROM reservations
+                WHERE reference = ? AND status = 'confirmed'
+            """, (reference,))
+            row = cursor.fetchone()
+
+            if not row:
+                return {"success": False, "message": "Reservation not found"}
+        
+            updates = []
+            values = []
+
+            if new_date:
+                updates.append("date = ?")
+                values.append(new_date)
+            if new_time:
+                updates.append("time = ?")
+                values.append(new_time)
+            if new_people:
+                updates.append("people = ?")
+                values.append(new_people)
+
+            if not updates:
+                return {"success": False, "message": "Nothing to update"}
+
+            values.append(reference)
+            query = f"UPDATE reservations SET {', '.join(updates)} WHERE reference = ?"
+
+            cursor.execute(query, values)
+
+            return {
+                "success": True,
+                "message": f"Reservation {reference} updated successfully"
+            }
+    
     def cancel_reservation(self, reference) -> dict:
-        return None
+        """Cancels a reservation by setting status to cancelled."""
+
+        with get_db() as db:
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT * FROM reservations
+                WHERE reference = ? AND status = 'confirmed'
+            """, (reference,))
+            row = cursor.fetchone()
+
+            if not row:
+                return {"success": False, "message": f"No active reservation found with reference {reference}"}
+            
+            cursor.execute("""
+                UPDATE reservations
+                SET status = 'cancelled'
+                WHERE reference = ?
+            """, (reference,))
+
+            return {
+                "success": True,
+                "message": f"Reservation {reference} cancelled successfully",
+                "customer_name": row["customer_name"],
+                "date": row["date"],
+                "time": row["time"]
+            }
     
