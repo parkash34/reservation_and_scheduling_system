@@ -258,9 +258,33 @@ class DatabaseManager:
 
 
     def get_reservations_by_name(self, name) -> dict:
-        return None
+        """Gets all reservations for a customer."""
+        with get_db() as db:
+            cursor = db.cursor()
+            cursor.execute("""
+                SELECT * FROM reservations
+                WHERE customer_name LIKE ? AND status = 'confirmed'
+                ORDER BY date, time
+            """, (f"%{name}%",))
+            rows = cursor.fetchall()
+
+            if not rows:
+                return {"found": False, "message": f"No reservations found for {name}"}
+
+            reservations = []
+            for row in rows:
+                reservations.append({
+                    "reference": row["reference"],
+                    "date": row["date"],
+                    "time": row["time"],
+                    "people": row["people"]
+                })
+
+            return {"found": True, "reservations": reservations}
+        
     def get_all_reservations(self, date=None) -> dict:
         """Gets all confirmed reservations optionally filtered by date."""
+        
         with get_db() as db:
             cursor = db.cursor()
             if date:
